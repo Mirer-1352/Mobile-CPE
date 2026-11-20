@@ -1,12 +1,12 @@
 package dev.autohotspot
 
 import android.Manifest
-import android.app.role.RoleManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
-import android.provider.Settings
+import android.net.Uri
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,75 +21,64 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 class MainActivity : ComponentActivity() {
-    private var foreground = false
-    private var launchingExternal = false
-    companion object { private var lastCpePause = -1L }
-
     override fun onResume() {
         super.onResume()
         Preferences.get(this).refresh()
-        foreground = true
-        launchingExternal = false
-        lastCpePause = -1L
+        RootSettingsSync.refresh()
         XposedConnection.resumed()
         AppUpdater.visible(true)
     }
 
     override fun onPause() {
-        lastCpePause = if (launchingExternal) -1L else SystemClock.elapsedRealtime()
-        foreground = false
         XposedConnection.paused()
         AppUpdater.visible(false)
         super.onPause()
     }
 
-    private fun homeFromCpe(intent: Intent, recreated: Boolean = false) = HomeNavigationPolicy.redirects(
-        intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME),
-        foreground, SystemClock.elapsedRealtime(), lastCpePause, recreated)
-
     override fun onNewIntent(intent: Intent) {
-        val redirect = homeFromCpe(intent)
         super.onNewIntent(intent)
         setIntent(intent)
-        if (redirect) openOriginalHome()
     }
 
     private fun openOriginalHome() {
-        launchingExternal = true
         runCatching { OriginalLauncher.open(this, Preferences.get(this)) }.onFailure {
-            launchingExternal = false
             Toast.makeText(this, it.message ?: "无法打开原桌面", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun openSystem(action: String) {
-        launchingExternal = true
         runCatching { startActivity(Intent(action)) }.onFailure {
-            launchingExternal = false
             Router.event("系统未提供此设置入口")
         }
-    }
-
-    private fun chooseDefaultHome() {
-        if (Build.VERSION.SDK_INT >= 29) {
-            val role = getSystemService(RoleManager::class.java)
-            if (role?.isRoleAvailable(RoleManager.ROLE_HOME) == true) {
-                launchingExternal = true
-                if (runCatching { startActivity(role.createRequestRoleIntent(RoleManager.ROLE_HOME)) }.isSuccess) return
-            }
-        }
-        openSystem(Settings.ACTION_HOME_SETTINGS)
     }
 
     private fun startGuardian() {
         runCatching { HotspotService.start(this) }.onFailure { Router.event("启动失败：${it.message}") }
     }
 
+    private fun viewSource() {
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/$UPDATE_REPO"))) }
+            .onFailure { Toast.makeText(this, "无法打开链接，请安装浏览器", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun copyDiagnostics() {
+        lifecycleScope.launch {
+            try {
+                val report = AppDiagnostics.report(this@MainActivity)
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("手机CPE诊断", report))
+                Toast.makeText(this@MainActivity, "诊断报告已复制", Toast.LENGTH_SHORT).show()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { Toast.makeText(this@MainActivity, "复制失败：${error.message}", Toast.LENGTH_LONG).show() }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val redirectHomeGesture = homeFromCpe(intent, recreated = savedInstanceState != null)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
@@ -141,12 +130,11 @@ class MainActivity : ComponentActivity() {
                     onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
                 }
                 if (settings) SettingsScreen(state, options, xposed, guardian, rootSettings, scroll,
-                    SettingsActions(::save, ::chooseDefaultHome, XposedConnection::syncAndRequest, ::openSystem,
-                        { permission.launch(arrayOf(Manifest.permission.READ_PHONE_STATE)) }))
+                    SettingsActions(::save, XposedConnection::syncAndRequest, ::openSystem,
+                        { permission.launch(arrayOf(Manifest.permission.READ_PHONE_STATE)) }, ::copyDiagnostics, ::viewSource))
                 else RouterDisplay(state, options, { settings = true }, { mode, enabled -> save { it.withSharing(mode, enabled) } }, ::openOriginalHome)
                 UpdateHost(this@MainActivity)
             }
         }
-        if (redirectHomeGesture) window.decorView.post { openOriginalHome() }
     }
 }

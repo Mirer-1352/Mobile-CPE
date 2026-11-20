@@ -69,7 +69,11 @@ class HotspotService : Service() {
             AppUpdater.tick(this@HotspotService)
             runCatching { cell.bind() }.onFailure { Router.event("蜂窝信息不可用：${it.message}", updateStatus = false) }
             try {
-                val observed = Snapshot.parse(root.request("snapshot"))
+                val protection = root.request("background", data = prefs.guardianConfiguration()).getJSONObject("protection")
+                AppDiagnostics.backgroundProtection(protection)
+                val raw = root.request("snapshot")
+                AppDiagnostics.observe(raw)
+                val observed = Snapshot.parse(raw)
                 val snapshot = observed.copy(usbHost = observed.usbHostOnly(usbHost))
                 val now = SystemClock.elapsedRealtime()
                 val rates = meter.sample(snapshot.nets, now)
@@ -97,10 +101,15 @@ class HotspotService : Service() {
                         reconciler.accepted(command, SystemClock.elapsedRealtime())
                         Router.event(if (command.start) "已请求开启${command.mode.label}，正在确认接口" else "已请求关闭${command.mode.label}")
                     } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (rejected: RootOperationException) { Router.event("${command.mode.label}：${rejected.message}") }
+                    catch (rejected: RootOperationException) {
+                        reconciler.rejected(command, SharingFailure(rejected.errorCode, rejected.errorName.orEmpty(), rejected.message.orEmpty()), SystemClock.elapsedRealtime())
+                        Router.event("${command.mode.label}：${rejected.message}")
+                    }
                 }
+                Router.update { it.copy(sharingProgress = reconciler.progress(prefs.read().sharingPolicy(), snapshot, currentUsb)) }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
+                AppDiagnostics.transportFailure(e.message ?: e.javaClass.simpleName)
                 Router.update { it.copy(root = false, fresh = false, down = null, up = null, clients = null) }
                 Router.event("Root 通道失败：${e.message ?: e.javaClass.simpleName}")
                 delay(12000)

@@ -5,6 +5,7 @@ import android.app.Application
 class RouterApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        AppDiagnostics.initialize(this)
         RootSettingsSync.initialize(this)
         runCatching { XposedConnection.initialize(this) }
             .onFailure { Router.event("LSPosed 服务不可用：${it.message}", updateStatus = false) }

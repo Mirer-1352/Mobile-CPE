@@ -18,10 +18,11 @@ import androidx.compose.ui.unit.sp
 
 internal class SettingsActions(
     val change: ((Options) -> Options) -> Boolean,
-    val defaultHome: () -> Unit,
     val requestScopes: () -> Unit,
     val openSystem: (String) -> Unit,
-    val requestPhone: () -> Unit
+    val requestPhone: () -> Unit,
+    val copyDiagnostics: () -> Unit,
+    val viewSource: () -> Unit
 )
 
 @Composable internal fun SettingsScreen(state: RouterState, options: Options, xposed: XposedState,
@@ -42,7 +43,7 @@ internal class SettingsActions(
                     !xposed.granted -> "待授权"
                     else -> ""
                 }, options.vpnSharing) { value -> actions.change { it.copy(vpnSharing = value) } }
-                Setting("共享守护", "", options.enabled) { value -> actions.change { it.copy(enabled = value) } }
+                Setting("共享守护", if (options.enabled && root.backgroundExempt == false) "后台运行豁免未生效" else "", options.enabled) { value -> actions.change { it.copy(enabled = value) } }
                 Setting("开机自动共享", "", options.boot) { value -> actions.change { it.copy(boot = value) } }
                 Setting("系统框架守护", when {
                     guardian.active -> guardian.message
@@ -56,18 +57,19 @@ internal class SettingsActions(
                     Setting("防烧屏位移", "每 3 分钟轻微移动面板，缓解固定画面残留", options.burnInProtection) { value -> actions.change { it.copy(burnInProtection = value) } }
                 }
                 Section("桌面模式") {
-                    OutlinedButton(onClick = actions.defaultHome) { Text("设为默认桌面") }
+                    Setting("设为默认桌面", when {
+                        root.error != null -> "Root 同步失败：${root.error}"
+                        root.pending -> "正在应用"
+                        root.homeError != null -> root.homeError
+                        root.homeEffective == true -> "已生效 · 底部上划进入原桌面"
+                        else -> ""
+                    }, options.forceHome) { value -> actions.change { it.copy(forceHome = value) } }
                     Text("${xposed.framework} · API ${if (xposed.api == 0) "—" else xposed.api}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text("实际作用域：${xposed.scopes.sorted().joinToString().ifEmpty { "尚未授权" }}", fontSize = 12.sp, color = Muted)
                     Text(xposed.message, fontSize = 12.sp, color = if (xposed.granted) Teal else Orange)
                     OutlinedButton(onClick = actions.requestScopes, enabled = xposed.canRequest) {
                         Text(if (xposed.requesting) "等待管理器确认" else if (xposed.granted) "同步作用域" else "同步并申请作用域")
                     }
-                    Setting("LSPosed 桌面接管", when {
-                        root.error != null -> "Root 同步失败：${root.error}"
-                        root.pending -> "正在同步 Root 配置"
-                        else -> "重启生效"
-                    }, options.forceHome) { value -> actions.change { it.copy(forceHome = value) } }
                 }
                 Section("系统配置") {
                     OutlinedButton(onClick = { actions.openSystem(Settings.ACTION_WIRELESS_SETTINGS) }) { Text("热点名称、密码与系统网络设置") }
@@ -75,13 +77,17 @@ internal class SettingsActions(
                     OutlinedButton(onClick = { actions.openSystem(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) }) { Text("配置电池优化与后台运行") }
                     OutlinedButton(onClick = { actions.openSystem(Settings.ACTION_SETTINGS) }) { Text("打开系统设置") }
                 }
-                Section("版本") { UpdateSetting() }
+                Section("版本") {
+                    UpdateSetting()
+                    OutlinedButton(onClick = actions.viewSource) { Text("查看源码") }
+                }
                 Surface(shape = RoundedCornerShape(16.dp), color = Color.White) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(if (state.root) "ROOT 已连接" else "ROOT 待授权 / 不可用", fontWeight = FontWeight.Bold, color = if (state.root) Teal else Orange)
                         Text(state.status, fontSize = 13.sp, color = Muted)
                         TextButton(onClick = { showLogs = !showLogs }) { Text(if (showLogs) "收起诊断" else "查看诊断") }
                         if (showLogs) {
+                            OutlinedButton(onClick = actions.copyDiagnostics) { Text("复制诊断报告") }
                             Text("Android ${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}", fontSize = 12.sp)
                             state.events.forEach { Text(it, fontSize = 11.sp, fontFamily = FontFamily.Monospace) }
                         }
@@ -97,8 +103,9 @@ internal class SettingsActions(
     Sharing.entries.forEach { mode ->
         val wanted = mode in options.desired
         val detail = when {
-            mode == Sharing.ETHERNET && !state.ethernetSupported -> "此系统不支持"
             !state.fresh -> "状态未知"
+            state.sharingProgress[mode] != null -> state.sharingProgress.getValue(mode).detail
+            mode == Sharing.ETHERNET && !state.ethernetSupported -> "此系统不支持"
             mode in state.active -> if (mode == Sharing.WIFI) state.clients?.let { "$it 台设备" } ?: "已开启" else "已开启"
             wanted && !state.running -> "待启动"
             wanted && mode == Sharing.USB && !state.usbConnected -> "等待接线"

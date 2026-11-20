@@ -1,6 +1,6 @@
 # GitHub / Root 自动更新
 
-仓库：[daxiaamu/Mobile-CPE](https://github.com/daxiaamu/Mobile-CPE)。适用于 Android 9+，当前 0.9.0 / versionCode 23。
+仓库：[daxiaamu/Mobile-CPE](https://github.com/daxiaamu/Mobile-CPE)。适用于 Android 9+，当前 0.10.2 / versionCode 31。
 
 原始更新技能为 `G:/My_Projects/TempROOT/.reference/update-by-github-skill/SKILL.md`。2026-11-20 用户明确要求「有 ROOT 能力，全自动更新」，因此本项目采用 Root 自动下载和安装，替代通用技能的三按钮确认、未知来源授权和系统安装器流程；其清单信任、SHA-256、APK 身份与发布校验要求继续保留。
 

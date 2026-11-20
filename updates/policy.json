@@ -1,8 +1,8 @@
 {
   "stable": {
-    "policyRevision": 1,
+    "policyRevision": 2,
     "maxForcedVersionCode": 0,
-    "reason": "首次接入更新，默认不强制升级"
+    "reason": "发布 0.10.2/code31：共享可靠性、默认桌面开关、后台保护、源码入口与 R8；保持强制更新边界为 0"
   },
   "beta": {
     "policyRevision": 1,

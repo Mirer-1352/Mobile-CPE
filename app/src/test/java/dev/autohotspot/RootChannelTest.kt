@@ -79,4 +79,21 @@ class RootChannelTest {
         try { channel.request(command("ok")); fail("Expected closed channel") } catch (_: IllegalStateException) { }
         assertEquals(0, starts)
     }
+
+    @Test fun structuredPlatformRejectionKeepsItsCodeAndNameWithoutReconnecting() = runBlocking {
+        var starts = 0
+        val channel = RootChannel({ starts++; FakeProcess { op ->
+            JSONObject().put("ok", op != "stop").put("error", "denied")
+                .put("errorCode", 14).put("errorName", "TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION")
+        } })
+        try {
+            try { channel.request(command("stop")); fail("Expected rejection") }
+            catch (error: RootOperationException) {
+                assertEquals(14, error.errorCode)
+                assertEquals("TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION", error.errorName)
+            }
+            assertTrue(channel.request(command("snapshot")).getBoolean("ok"))
+            assertEquals(1, starts)
+        } finally { channel.close() }
+    }
 }

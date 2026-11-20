@@ -8,7 +8,7 @@
 | --- | --- | --- | --- | --- |
 | Wi-Fi / USB 控制 | Root IConnectivityManager + ResultReceiver | Root TetheringManager 请求/接口回调 | 同左 | 同左，隐藏方法运行时核对 |
 | 以太网共享 | 保存期望；提示执行不支持，不调用缺失 API | 原生类型 5，需 USB Host/网卡驱动 | 同左 | 同左 |
-| USB NCM | 不假定有独立 NCM API | 识别 ncm 接口；关闭 USB 也尝试停止类型 4 | 同左 | 同左 |
+| USB NCM | 不假定有独立 NCM API | 按原生类型识别；RNDIS 不支持而 NCM 支持时选 NCM，仅实际 NCM 活跃时补充停止 | 同左 | 同左 |
 | Wi-Fi 客户端 | SoftApCallback + Handler，数量回调 | Executor + 客户端列表回调 | 同左 | 同左，厂商/多 AP 差异待实测 |
 | 运营商/信号 | READ_PHONE_STATE；9 的 dBm 可未知，10+ 读取 CellSignalStrength | 增加 TelephonyDisplayInfo NSA 标识 | 同左 | 同左，旧监听 API 仍需 ROM 支持 |
 | 默认桌面 | 9 使用 HOME 设置；10+ RoleManager | RoleManager 可用性检查与 HOME 设置回退 | 同左 | 同左 |
@@ -50,7 +50,7 @@
 | 双 SIM/NSA/SA | 版本保护与源码审查，现机 SA 显示 | 真双卡切换、NSA/SA 切换和 SIM 热插拔 |
 | LSPosed HOME/VPN | API102 作用域策略单测，框架和网络共享进程已实际加载模块；系统守护已实测 | HOME 接管与 VPN 上游功能仍未作实际链路验收；VPN 按用户要求未连接测试 |
 | 更新网络源 | 信任与回退单测、发布器本地 Git 集成测试；缓存包到 Root 安装实测 | 首个真实 Release、多 CDN 健康筛选和网络下载 |
-| Android 9–16 运行 | minSdk28 lint、AOSP API/命令审查 | 当前没有可运行的这些系统镜像/设备；旧 API28 AVD 配置残留但镜像与 emulator 不在现 SDK，不能记为实测 |
+| Android 9–16 运行 | minSdk28 lint、AOSP API/命令审查；0.10.0 新增 Find X9 Pro/API36 的原生观察、ROOT 升级与诊断实测 | Android 9–15 仍没有对应可运行镜像/设备；Find 以太网问题仍在定位，不能记为该功能通过 |
 
 主机另有平板接入，本次未擅自安装或改变其设置。无任何证据可支持「全部 ROM 已兼容」的承诺；矩阵保留具体待验收项。
 

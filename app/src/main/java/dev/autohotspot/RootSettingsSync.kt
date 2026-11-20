@@ -5,7 +5,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 
-internal data class RootSettingsState(val pending: Boolean = true, val error: String? = null)
+internal data class RootSettingsState(val pending: Boolean = true, val error: String? = null,
+    val backgroundExempt: Boolean? = null, val homeEffective: Boolean? = null, val homeError: String? = null)
 
 /** One actor applies the latest durable intent; retries cannot outlive or overtake each other. */
 internal object RootSettingsSync {
@@ -15,6 +16,8 @@ internal object RootSettingsSync {
     private val mutable = MutableStateFlow(RootSettingsState())
     val state = mutable.asStateFlow()
     private var initialized = false
+
+    fun refresh() { changes.trySend(Unit) }
 
     fun initialize(context: Context) {
         if (initialized) return
@@ -39,7 +42,16 @@ internal object RootSettingsSync {
                         check(reply.optBoolean("saved")) { "系统中已有更新的配置" }
                         saved = true
                         val latest = preferences.guardianConfiguration().getLong("revision")
-                        mutable.value = RootSettingsState(pending = latest != configuration.getJSONObject("policy").getLong("revision"))
+                        val protection = reply.optJSONObject("backgroundProtection")
+                        val home = reply.optJSONObject("home")
+                        home?.optString("original")?.takeIf { it.isNotEmpty() }?.let {
+                            if (preferences.originalHome != it) preferences.originalHome = it
+                        }
+                        val exempt = protection?.opt("exempt") as? Boolean
+                        if (protection?.isNull("error") == false) Router.event("后台运行保护：${protection.optString("error")}", updateStatus = false)
+                        mutable.value = RootSettingsState(pending = latest != configuration.getJSONObject("policy").getLong("revision"),
+                            backgroundExempt = exempt, homeEffective = home?.opt("effective") as? Boolean,
+                            homeError = home?.opt("error") as? String)
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) {
                         mutable.value = RootSettingsState(error = error.message)

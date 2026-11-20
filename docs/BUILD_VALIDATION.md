@@ -144,3 +144,15 @@
 
 
 0.9.0 / code23 Release: see [RELEASE_0.9.0.md](RELEASE_0.9.0.md) for final APK identity, USB/Ethernet guards, 86 passing tests, Root upgrade evidence and the unconfirmed Find X9 Pro issue.
+
+## 0.10.0/code26 可靠性验证
+
+Debug/Release 构建、单测编译和两种变体 lint 通过；108 项 JVM 测试，lint 0 errors / 32 warnings。最终 APK 与 OnePlus、Find 两机安装文件 SHA-256 一致，分别完成 23→25→26、24→25→26 的独立 ROOT 安装与配置/服务恢复。详情、产物签名及 Find 实际网卡共享见 [RELIABILITY_0.10.0.md](RELIABILITY_0.10.0.md)。最后一次真实开机后来已确认无需拔插约 23.7 秒共享，原始故障根因仍未宣称解决。未发布 GitHub Release。
+
+## 0.10.1/code29
+
+Debug/Release 构建及 lint、111 项 JVM 测试、APK 签名通过。Find 与 OnePlus 均完成独立 ROOT 更新器 28→29，实际安装 APK 摘要相同，服务、回调、偏好和 system_server 保持预期。默认桌面开关往返、原桌面上划和 Find 限时后台保护对照见 [RELIABILITY_0.10.1.md](RELIABILITY_0.10.1.md)。未发布 GitHub Release。
+
+## 0.10.2/code31
+
+Release 开启 R8 与资源压缩，Debug 保持未压缩。两种构建与 lint、111 项核心测试、签名和最终 DEX/模块入口检查通过；APK 约 2.07 MB。OnePlus 完成未压缩→R8→最终 R8 的独立 ROOT 升级，并验证源码链接与 API 102 服务连接。Find 只完成候选压缩包 ROOT 只读检查，随后无线调试失联，没有安装最终版。证据与映射归档见 [RELEASE_0.10.2.md](RELEASE_0.10.2.md)。

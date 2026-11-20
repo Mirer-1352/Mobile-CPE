@@ -119,4 +119,82 @@ class SharingReconcilerTest {
         controller.plan(policy, adapter.copy(active = setOf(Sharing.ETHERNET)), false, 0, 2000)
         assertEquals(listOf(command), controller.plan(policy, adapter, false, 0, 3000).commands)
     }
+
+    @Test fun realCapabilitiesBlockUnsupportedStartWithoutErasingDesired() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.ETHERNET))
+        val adapter = snapshot().copy(ethernetPresent = true, supported = setOf(Sharing.WIFI, Sharing.USB))
+        assertTrue(controller.plan(policy, adapter, false, 0, 1000).commands.isEmpty())
+        assertEquals(setOf(Sharing.ETHERNET), policy.desired)
+        assertEquals(1, controller.plan(policy, adapter.copy(supported = Sharing.entries.toSet()), false, 0, 2000).commands.size)
+    }
+
+    @Test fun permissionFailureWaitsForAChangeRatherThanRetryingEveryPoll() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.USB))
+        val state = snapshot()
+        val command = controller.plan(policy, state, true, 0, 1000).commands.single()
+        controller.submitted(command, 1000)
+        controller.rejected(command, SharingFailure(14, "TETHER_ERROR_NO_CHANGE_TETHERING_PERMISSION"), 1000)
+        assertTrue(controller.plan(policy, state, true, 0, 100000).commands.isEmpty())
+        assertEquals(listOf(command), controller.plan(policy, state, true, 1, 100001).commands)
+    }
+
+    @Test fun aRejectedStartCannotBlockTheUsersNewStopRequest() {
+        val controller = SharingReconciler()
+        val command = controller.plan(options(setOf(Sharing.USB)), snapshot(), true, 0, 1000).commands.single()
+        controller.submitted(command, 1000)
+        controller.rejected(command, SharingFailure(14, "SECURITY_EXCEPTION"), 1000)
+        assertEquals(listOf(SharingCommand(Sharing.USB, false)),
+            controller.plan(options(stops = setOf(Sharing.USB)), snapshot(), true, 0, 2000).commands)
+    }
+
+    @Test fun asyncPermissionErrorBlocksOnlyTheFailedModeAndARepeatEventDoesNotDisappear() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.USB, Sharing.ETHERNET))
+        val fault = InterfaceFailure("eth0", Sharing.ETHERNET, SharingFailure(14, "SECURITY_EXCEPTION"), 1)
+        val state = snapshot().copy(ethernetPresent = true, failures = listOf(fault))
+        assertEquals(listOf(SharingCommand(Sharing.USB, true)), controller.plan(policy, state, true, 0, 1000).commands)
+        val changed = state.copy(failures = listOf(fault.copy(sequence = 2)))
+        assertFalse(controller.plan(policy, changed, true, 0, 100000).commands.any { it.mode == Sharing.ETHERNET })
+    }
+
+    @Test fun losingUpstreamNeverTearsDownOrRestartsAnActiveDownstream() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.WIFI))
+        val state = snapshot(setOf(Sharing.WIFI)).copy(upstreamKnown = true, upstreamPresent = false)
+        assertTrue(controller.plan(policy, state, false, 0, 1000).commands.isEmpty())
+        assertEquals("已开启，上游未就绪", controller.progress(policy, state, false).getValue(Sharing.WIFI).detail)
+    }
+
+    @Test fun transientRequestFailureStillUsesBoundedRetry() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.USB))
+        val command = controller.plan(policy, snapshot(), true, 0, 1000).commands.single()
+        controller.submitted(command, 1000)
+        controller.rejected(command, SharingFailure(4, "TETHER_ERROR_UNAVAIL_IFACE"), 1000)
+        assertTrue(controller.plan(policy, snapshot(), true, 0, 3999).commands.isEmpty())
+        assertEquals(listOf(command), controller.plan(policy, snapshot(), true, 0, 4000).commands)
+    }
+
+    @Test fun missedOemPolicyNotificationStillRecoversWithASlowProbe() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.WIFI))
+        val command = controller.plan(policy, snapshot(), false, 0, 1000).commands.single()
+        controller.submitted(command, 1000)
+        controller.rejected(command, SharingFailure(11, "TETHER_ERROR_PROVISIONING_FAILED"), 1000)
+        assertTrue(controller.plan(policy, snapshot(), false, 0, 300999).commands.isEmpty())
+        assertEquals(listOf(command), controller.plan(policy, snapshot(), false, 0, 301000).commands)
+        assertEquals(setOf(Sharing.WIFI), policy.desired)
+    }
+
+    @Test fun observedSuccessClearsAnEarlierPermissionRejectionBeforeTheNextDisconnect() {
+        val controller = SharingReconciler()
+        val policy = options(setOf(Sharing.WIFI))
+        val command = controller.plan(policy, snapshot(), false, 0, 1000).commands.single()
+        controller.submitted(command, 1000)
+        controller.rejected(command, SharingFailure(14, "SECURITY_EXCEPTION"), 1000)
+        controller.plan(policy, snapshot(setOf(Sharing.WIFI)), false, 0, 2000)
+        assertEquals(listOf(command), controller.plan(policy, snapshot(), false, 0, 3000).commands)
+    }
 }

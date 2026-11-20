@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeoutException
 
 /** A command rejection is a valid reply; only a broken transport invalidates the session. */
-internal class RootOperationException(message: String) : IOException(message)
+internal class RootOperationException(message: String, val errorCode: Int? = null, val errorName: String? = null) : IOException(message)
 
 internal class RootChannel(private val spawn: () -> Process, private val timeoutMillis: Long = 45_000) : AutoCloseable {
     private val requests = Mutex()
@@ -65,7 +65,9 @@ internal class RootChannel(private val spawn: () -> Process, private val timeout
     }
 
     private fun requireSuccess(reply: JSONObject) {
-        if (!reply.optBoolean("ok")) throw RootOperationException(reply.optString("error", "Root 操作失败"))
+        if (!reply.optBoolean("ok")) throw RootOperationException(reply.optString("error", "Root 操作失败"),
+            if (reply.has("errorCode") && !reply.isNull("errorCode")) reply.getInt("errorCode") else null,
+            reply.optString("errorName").takeIf { it.isNotBlank() })
     }
 
     private inner class Session(private val process: Process) : AutoCloseable {

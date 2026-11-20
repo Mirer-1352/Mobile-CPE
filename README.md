@@ -2,23 +2,26 @@
 
 基于 Root 的 Android 随身路由器，原生 Kotlin + Jetpack Compose。最低 Android 9（API 28），以太网输出需要 Android 11+ 的原生 Tethering 服务与 USB 网卡驱动。本项目不承诺所有厂商 ROM 通用；下面的设备验证仍需在真实 Root 手机上执行。
 
-[下载 0.9.0](https://github.com/daxiaamu/Mobile-CPE/releases/tag/v0.9.0)。发布包为非调试 Release 变体，沿用现有开发签名，可覆盖此前测试安装。当前为公开测试阶段。
+[下载 0.10.2](https://github.com/daxiaamu/Mobile-CPE/releases/tag/v0.10.2)。发布包为非调试 Release 变体，使用 R8 优化与资源压缩，沿用现有开发签名，可覆盖此前测试安装。当前为公开测试阶段。
+
+0.10.2/code31 已加入源码入口，并启用 Release R8，见 [版本记录](docs/RELEASE_0.10.2.md)。默认桌面开关和可选 ROM 后台保护见 [0.10.1 验证](docs/RELIABILITY_0.10.1.md)。
 
 ## 功能
 
 - Wi-Fi 热点、USB 网络共享、以太网共享可分别选择，并保存到设备加密存储。
 - 开关只表示持久化的用户期望；实际共享状态只影响图标和状态文字。没有网卡、未接线、共享失败或重开面板均不取消选择，设备重新接入时重新尝试。
-- 前台守护每 3 秒读取实际共享接口；开机恢复、断线重试可配置。失败按 3/6/12/24/48/60 秒退避，正常开启后清零。
+- 前台守护每 3 秒读取实际共享接口；开机恢复、断线重试可配置。暂时失败按 3/6/12/24/48/60 秒退避，正常开启后清零；权限、鉴权等拒绝等待条件变化，同时允许五分钟一次的低频探测。
 - 默认开启系统框架守护：现代 API 102 Hook system_server 启动和进程退出，结合心跳、巡检与限速恢复共享服务。需启用模块、批准 system 作用域并重启；连接状态按实际框架确认显示，见 [守护说明](docs/FRAMEWORK_GUARDIAN.md)。
 - USB 线断开时保留用户意图，重新接入后重开。USB 网卡掉线时重试以太网共享，由系统管理 DHCP、NAT 和上游，不硬编码 iptables 或 Binder 事务号。
 - 全屏大字显示上下行共享速率，固定 M/s、两位小数（1 M/s = 1,000,000 字节/秒）。顶部显示运营商、无线制式、信号和 Wi-Fi 客户端数量；未知值显示「—」。
-- HOME 桌面入口，支持系统默认桌面选择；内置可选 LSPosed HOME 解析适配。
+- 设置内以「设为默认桌面」单一开关控制：开启通过 ROOT 设置系统 HOME，保留 LSPosed 解析兜底；关闭恢复接管前的原桌面。按 HOME 留在手机CPE，底部上划进入原桌面。
 - 顶部显示状态，中间显示速率，底部横排 Wi-Fi、USB、以太网图标开关；无 APP 标题、副标题和设置文字入口。长按进入 MCPE 设置，侧边返回回仪表，底部上划打开原桌面。竖屏上下排列速率，横屏左右排列。
 - 最顶部显示日期、星期和实时秒钟；底部图标默认白色，Wi-Fi 有客户端时变绿，USB/以太网以实际共享开启状态变绿。
 - MCPE 设置提供「屏幕常亮」和默认开启的「防烧屏位移」：参考 mijiapanel，每 3 分钟在 ±16 物理像素范围轮换位置，800 毫秒过渡；面板整体移动并预留边缘，后台暂停，关闭复位。常亮只作用于本应用窗口。
 - VPN 共享开关默认开启，可在设置关闭；通过现代 LSPosed 适配原生共享上游，见 [接入说明](docs/VPN_SHARING.md)。
 - Root 全自动更新连接 `daxiaamu/Mobile-CPE`：后台定时检查、stable/beta、多源下载、APK 哈希/身份校验与独立进程覆盖安装，升级后恢复共享。无需确认安装或未知来源授权。设置可检查与查看 Markdown 说明；发布工作流和首发步骤见 [更新说明](docs/APP_UPDATES.md)。
-- 本地诊断记录最多 30 条，不包含热点密码，不提供网络监听端口。
+- 设置可复制诊断报告；应用私有存储保留最多 160 条、64 KiB 的结构化历史，包含原生错误、ROM/Mainline、上游与 USB 驱动信息，不包含热点密码、SSID 或客户端地址，不提供网络监听端口。
+- 设置「版本」中可「查看源码」，打开本项目 GitHub 仓库。
 
 ## 使用
 
@@ -38,11 +41,11 @@
 
 管理器仍需确认授权。拒绝/失败/等待超过 60 秒后不会反复自动弹窗，可在设置点击「同步并申请作用域」。服务断开会清除旧状态，重连后重新检查；应用在后台只同步，不发起申请。作用域已授权不代表 Hook 已注入，首次启用或作用域变更后请重启手机。系统进程不启用自动热重载。
 
-随后打开「LSPosed 桌面接管」。Root 同步器按单调版本顺序应用配置；接管标记保存在 `/data/system/mobile-cpe-home/<user>.enabled`，仅按 HOME 请求所属用户生效。用户 0 的旧 `/data/system/autohotspot-home` 在迁移前仍可读取。Hook 在 `onSystemServerStarting()` 注册，使用现代拦截链，仅改写无显式目标的 MAIN + HOME 解析结果，适配失败时保留原结果。
+打开「设为默认桌面」即可同时控制系统 HOME 与框架兜底，无需分别操作两个入口。Root 同步器按单调版本应用配置，先记录原桌面，再设置并核对实际 HOME；默认状态不以命令返回成功代替验证。接管标记保存在 `/data/system/mobile-cpe-home/<user>.enabled`，仅按 HOME 请求所属用户生效。用户 0 的旧 `/data/system/autohotspot-home` 在迁移前仍可读取。Hook 在 `onSystemServerStarting()` 注册，仅改写无显式目标的 MAIN + HOME 解析结果，适配失败时保留原结果。
 
 已提供 Android 9/10 PackageManagerService、较新系统 ComputerEngine / ResolveIntentHelper 的 AOSP 入口。厂商私有启动策略仍可能覆盖结果，**模块开关成功不表示模块已激活或厂商限制已解除**，须按 Home 实测。没有使用包名猜测去关闭厂商安全组件。
 
-恢复：关闭应用中的接管开关；或在 LSPosed 停用模块并重启；或删除对应用户的 `/data/system/mobile-cpe-home/<user>.enabled`（用户 0 同时检查旧 `/data/system/autohotspot-home`）。卸载前建议先关闭接管。
+恢复：关闭「设为默认桌面」，会清除框架标记，并在系统 HOME 仍为手机CPE 时恢复原桌面；已经换成其他桌面时不覆盖该选择。仅停用模块或删除标记不会撤销系统原生 HOME 角色，可在系统默认应用设置中另选桌面。卸载前可先关闭开关。
 
 ## 构建
 
@@ -54,11 +57,20 @@ JDK 17+，Android SDK Platform 37，Gradle 9.4.1。Android Studio 打开根目�
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`。debug 使用开发签名，正式发行请自行配置私有签名；项目不包含签名密钥。Gradle 从 Google Maven、Maven Central 获取依赖，Google 与 Central 配有阿里云镜像用于网络受限环境。
 
+Release 使用 R8 代码压缩、优化、混淆与资源压缩，Debug 保持未压缩。`app/proguard-rules.pro` 仅显式保留 `app_process` 的 RootMain/RootUpdateWorker main 入口和现代 Xposed 的 CpeModule 构造入口，系统反射目标属于 ROM，不对整个应用添加宽泛 keep。构建后应保存 `app/build/outputs/mapping/release/` 对应版本的映射和报告，用于堆栈还原。
+
+```powershell
+.\gradlew.bat :app:assembleRelease
+python scripts/verify_r8_release.py --apk app/build/outputs/apk/release/app-release.apk --mapping app/build/outputs/mapping/release/mapping.txt
+```
+
+入口检查读取最终 DEX 与模块元数据，确认两个独立 ROOT 入口、模块构造和回调仍存在，以及确实发生应用代码混淆；不能代替设备上的 ROOT、共享与框架加载验证。
+
 Windows 用户目录含中文时，如果 Gradle Test Executor 无法找到 GradleWorkerMain，可用 `powershell -ExecutionPolicy Bypass -File scripts/Test-Core.ps1` 编译并直接执行相同的 JUnit 测试，绕过 Gradle worker 参数文件的路径编码问题。
 
 ## 技术边界
 
-- Root 进程从当前 APK 的 dex 启动，通过父进程 stdin/stdout JSON 通信；隐藏 API 豁免仅作用于该 Root 进程。Android 9/10 使用 IConnectivityManager 的 ResultReceiver，Android 11+ 使用 TetheringManager 的 TetheringRequest 和回调。请求成功后仍以 `getTetheredIfaces` 确认实际状态。
+- Root 进程从当前 APK 的 dex 启动，通过父进程 stdin/stdout JSON 通信；隐藏 API 豁免仅作用于该 Root 进程。Android 9/10 使用 IConnectivityManager 的 ResultReceiver；Android 11+ 使用 TetheringManager 请求和原生接口/能力/错误回调，首次回调前回退旧接口查询。请求被接收与实际接口开启分别确认。
 - Root 或 SELinux 策略可能拒绝 app_process / Binder 调用，界面保留错误；不会全局关闭 SELinux、关闭隐藏 API 策略或修改运营商鉴权。系统要求的共享资费/鉴权仍然有效。
 - Android 9/10 缺少本项目使用的原生以太网共享接口；仍允许保存以太网期望选择并提示当前系统不支持，不调用缺失 API，不将静态 NAT 脚本伪装成通用兼容。
 - SoftApCallback 由 Root 注册，若 ROM 不支持则数量未知，不用 ARP 表猜测设备数量。多 AP 的新回调、厂商回调及双频并发热点需真机验证。
@@ -75,6 +87,8 @@ Windows 用户目录含中文时，如果 Gradle Test Executor 无法找到 Grad
 已在 OnePlus 8T 完成 Wi-Fi、USB 共享、外部关闭后恢复、USB 实际外网访问与开机恢复验证；0.9.0 重构后再次完成真实 system_server 注入、强停/冻结恢复和暂停不恢复验收，详见 [实测结果](docs/DEVICE_RESULTS.md)。以太网硬件、LSPosed HOME/VPN 功能链路和其他 Android/ROM 仍待验证。
 
 全代码审查发现、职责边界与本次验证见 [CODE_REVIEW.md](docs/CODE_REVIEW.md)。
+
+本地 0.10.0/code26 的可靠性改造、108 项测试、两台手机的 ROOT 升级验证，以及仍在定位的 Find 以太网故障见 [RELIABILITY_0.10.0.md](docs/RELIABILITY_0.10.0.md)。公开下载版本仍为 0.9.0。
 
 ## API 参考
 

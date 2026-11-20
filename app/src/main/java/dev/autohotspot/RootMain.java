@@ -15,8 +15,9 @@ public final class RootMain {
     private static final HandlerThread callbacks = new HandlerThread("router-callbacks");
     private static volatile Integer clients;
     private static Object wifiCallback;
-    private static Object tether;
-    private static final Executor executor = Runnable::run;
+    private static TetheringBackend backend;
+    private static final RootVendorBackgroundLease backgroundLease = new RootVendorBackgroundLease();
+    private static final Executor executor = command -> new Handler(callbacks.getLooper()).post(command);
 
     public static void main(String[] args) {
         try {
@@ -30,6 +31,13 @@ public final class RootMain {
                     JSONObject request = new JSONObject(line);
                     switch (request.getString("op")) {
                         case "snapshot": reply(snapshot()); break;
+                        case "background":
+                            GuardianPolicy protection = GuardianPolicy.parse(request.getJSONObject("data"));
+                            if (AndroidPlatform.asUser(context, protection.user).getPackageManager()
+                                .getPackageInfo(GuardianContract.PACKAGE, 0).firstInstallTime != protection.installedAt)
+                                throw new SecurityException("Background lease install identity mismatch");
+                            reply(new JSONObject().put("ok", true).put("protection", backgroundLease.sync(context, protection)));
+                            break;
                         case "start": reply(change(request.getInt("type"), true)); break;
                         case "stop": reply(change(request.getInt("type"), false)); break;
                         case "update": reply(RootUpdateWorker.prepare(context, request.getJSONObject("data"))); break;
@@ -40,21 +48,34 @@ public final class RootMain {
                             Context policyContext = AndroidPlatform.asUser(context, policy.user);
                             if (policyContext.getPackageManager().getPackageInfo(GuardianContract.PACKAGE, 0).firstInstallTime != policy.installedAt)
                                 throw new SecurityException("Guardian install identity mismatch");
-                            reply(new JSONObject().put("ok", true).put("saved", new GuardianFiles(new File(GuardianContract.DIRECTORY))
-                                .save(policy, () -> HomeOverrides.set(policy.user, configuration.getBoolean("forceHome")))));
+                            GuardianFiles policies = new GuardianFiles(new File(GuardianContract.DIRECTORY));
+                            JSONObject[] home = new JSONObject[1];
+                            boolean saved = policies.save(policy, () -> home[0] = RootHomeController.sync(context, policy,
+                                configuration.optBoolean("defaultHome", configuration.optBoolean("forceHome")), configuration.optString("originalHome")));
+                            JSONObject configured = new JSONObject().put("ok", true).put("saved", saved);
+                            if (saved) configured.put("home", home[0]);
+                            if (saved) configured.put("backgroundProtection", RootBackgroundProtection.sync(context, policies));
+                            reply(configured);
                             break;
                         default: throw new IllegalArgumentException("未知操作");
                     }
                 } catch (Throwable error) {
                     Throwable cause = error;
                     while (cause.getCause() != null) cause = cause.getCause();
-                    reply(new JSONObject().put("ok", false).put("error", cause.toString()));
+                    JSONObject failure = new JSONObject().put("ok", false).put("error", cause.toString());
+                    if (cause instanceof TetheringFailure) ((TetheringFailure) cause).appendTo(failure);
+                    else if (cause instanceof SecurityException) failure.put("errorName", "SECURITY_EXCEPTION");
+                    else if (cause instanceof UnsupportedOperationException) failure.put("errorName", "UNSUPPORTED_OPERATION");
+                    reply(failure);
                 }
             }
         } catch (Throwable error) {
             try { reply(new JSONObject().put("ok", false).put("error", error.toString())); }
             catch (Exception ignored) { }
-        } finally { System.exit(0); }
+        } finally {
+            if (backend != null) backend.close();
+            System.exit(0);
+        }
     }
 
     private static void reply(JSONObject value) {
@@ -70,14 +91,14 @@ public final class RootMain {
         if (type == 1 && UsbState.read(context).hostOnly())
             throw new IllegalStateException("USB 正处于 Host 模式，暂不改变 USB 共享，以免断开外接设备");
         Object tether = tethering();
+        int nativeType = Build.VERSION.SDK_INT >= 30 ? backend.startType(type) : type;
         if (!start) {
-            tether.getClass().getMethod("stopTethering", int.class).invoke(tether, type);
+            boolean acknowledged = Build.VERSION.SDK_INT >= 30 ? TetheringStop.request(tether, context, nativeType, backend::errorName) : false;
+            if (Build.VERSION.SDK_INT < 30) tether.getClass().getMethod("stopTethering", int.class).invoke(tether, type);
             // Native NCM is a separate tethering type on Android 11+, but is one USB option in our UI.
-            if (type == 1 && Build.VERSION.SDK_INT >= 30) {
-                try { tether.getClass().getMethod("stopTethering", int.class).invoke(tether, 4); }
-                catch (ReflectiveOperationException ignored) { } // ROMs without NCM still stop ordinary USB above.
-            }
-            return new JSONObject().put("ok", true);
+            if (type == 1 && nativeType != 4 && Build.VERSION.SDK_INT >= 30 && backend.hasNcmActive())
+                acknowledged &= TetheringStop.request(tether, context, 4, backend::errorName);
+            return new JSONObject().put("ok", true).put("stopAcknowledged", acknowledged).put("nativeType", nativeType);
         }
         CountDownLatch done = new CountDownLatch(1);
         int[] result = {-1};
@@ -89,7 +110,7 @@ public final class RootMain {
                 return objectMethod(p, m, a);
             });
             Class<?> builderClass = Class.forName("android.net.TetheringManager$TetheringRequest$Builder");
-            Object builder = builderClass.getConstructor(int.class).newInstance(type);
+            Object builder = builderClass.getConstructor(int.class).newInstance(nativeType);
             Object request = builderClass.getMethod("build").invoke(builder);
             tether.getClass().getMethod("startTethering", request.getClass(), Executor.class, callback)
                 .invoke(tether, request, executor, proxy);
@@ -104,8 +125,8 @@ public final class RootMain {
                 .invoke(service, type, receiver, false, "android");
         }
         if (!done.await(12, TimeUnit.SECONDS)) throw new IOException("共享请求回调超时，将重新读取实际状态");
-        if (result[0] != 0) throw new IOException("系统拒绝开启共享，错误码 " + result[0]);
-        return new JSONObject().put("ok", true);
+        if (result[0] != 0) throw new TetheringFailure(result[0], backend.errorName(result[0]));
+        return new JSONObject().put("ok", true).put("nativeType", nativeType);
     }
 
     private static Object objectMethod(Object p, Method m, Object[] a) {
@@ -134,13 +155,13 @@ public final class RootMain {
     }
 
     private static JSONArray regex(String name) {
+        Object tether = backend.manager;
         try { return new JSONArray(Arrays.asList((String[]) tether.getClass().getMethod(name).invoke(tether))); }
         catch (Exception ignored) { return new JSONArray(); }
     }
 
     private static JSONObject snapshot() throws Exception {
         Object tether = tethering();
-        String[] active = (String[]) tether.getClass().getMethod("getTetheredIfaces").invoke(tether);
         JSONArray interfaces = new JSONArray();
         File[] dirs = new File("/sys/class/net").listFiles();
         if (dirs != null) for (File dir : dirs) {
@@ -151,21 +172,19 @@ public final class RootMain {
                 .put("tx", readLong(new File(dir, "statistics/tx_bytes")))
                 .put("carrier", readLong(new File(dir, "carrier")) == 1));
         }
-        return UsbState.read(context).appendTo(new JSONObject().put("ok", true).put("active", new JSONArray(Arrays.asList(active)))
+        return UsbState.read(context).appendTo(backend.snapshot().put("ok", true)
             .put("interfaces", interfaces).put("clients", clients == null ? JSONObject.NULL : clients)
             .put("wifiRegex", regex("getTetherableWifiRegexs"))
             .put("usbRegex", regex("getTetherableUsbRegexs"))
-            .put("ethernetSupported", Build.VERSION.SDK_INT >= 30));
+            .put("ethernetSupported", Build.VERSION.SDK_INT >= 30)
+            .put("rootUid", android.os.Process.myUid()).put("rootPid", android.os.Process.myPid()));
     }
-    @android.annotation.SuppressLint("InlinedApi") // "tethering" exists since API 30 as a hidden service name.
-    private static Object tethering() {
-        if (tether == null) {
-            // This service exists since API 30; its public constant was exposed only in API 36.
-            tether = context.getSystemService(Build.VERSION.SDK_INT >= 30 ? Context.TETHERING_SERVICE : Context.CONNECTIVITY_SERVICE);
-            if (tether == null) throw new UnsupportedOperationException("此 ROM 未提供共享管理服务");
+    private static Object tethering() throws Exception {
+        if (backend == null) {
+            backend = new TetheringBackend(context, executor);
             registerClients();
         }
-        return tether;
+        return backend.manager;
     }
     private static String masterName(File dir) {
         try {

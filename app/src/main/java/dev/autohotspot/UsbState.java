@@ -3,6 +3,7 @@ package dev.autohotspot;
 import android.content.Context;
 import android.hardware.usb.UsbManager;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.File;
 import java.lang.reflect.Array;
 import java.nio.file.Files;
@@ -55,6 +56,33 @@ final class UsbState {
 
     JSONObject appendTo(JSONObject value) throws Exception {
         return value.put("usbHost", host).put("usbDevice", device == null ? JSONObject.NULL : device)
-            .put("usbConnected", gadgetConnected);
+            .put("usbConnected", gadgetConnected).put("usbHardware", hardware());
+    }
+
+    /** Device IDs and driver bindings only; never read serials or user-visible USB strings. */
+    private static JSONObject hardware() throws Exception {
+        JSONObject result = new JSONObject();
+        JSONArray devices = new JSONArray(), drivers = new JSONArray();
+        try {
+            File[] nodes = new File("/sys/bus/usb/devices").listFiles();
+            if (nodes == null) throw new java.io.IOException("USB sysfs is unavailable");
+            Arrays.sort(nodes, Comparator.comparing(File::getName));
+            for (File node : nodes) {
+                String port = node.getName();
+                if (!port.matches("[0-9]+-[0-9]+(?:\\.[0-9]+)*(?::[0-9]+\\.[0-9]+)?")) continue;
+                File vendor = new File(node, "idVendor");
+                if (vendor.isFile()) devices.put(new JSONObject().put("port", port)
+                    .put("vendor", attribute(vendor)).put("product", attribute(new File(node, "idProduct")))
+                    .put("class", attribute(new File(node, "bDeviceClass"))));
+                File driver = new File(node, "driver");
+                if (driver.exists()) drivers.put(new JSONObject().put("port", port).put("driver", driver.getCanonicalFile().getName()));
+            }
+        } catch (Exception error) { result.put("error", error.toString()); }
+        return result.put("devices", devices).put("drivers", drivers);
+    }
+
+    private static String attribute(File file) throws Exception {
+        String value = new String(Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.US_ASCII).trim();
+        return value.matches("[a-fA-F0-9]{2,4}") ? value : "unknown";
     }
 }

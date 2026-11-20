@@ -9,8 +9,8 @@ android {
         applicationId = "dev.autohotspot"
         minSdk = 28
         targetSdk = 35
-        versionCode = 23
-        versionName = "0.9.0"
+        versionCode = 31
+        versionName = "0.10.2"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -19,7 +19,9 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             isDebuggable = false
             // Keep signer continuity with installations made during development.
             signingConfig = signingConfigs.getByName("debug")

@@ -127,3 +127,11 @@
 
 
 0.9.0 / code23 Release: see [RELEASE_0.9.0.md](RELEASE_0.9.0.md) for final APK identity, USB/Ethernet guards, 86 passing tests, Root upgrade evidence and the unconfirmed Find X9 Pro issue.
+
+## 0.10.0/code26
+
+新增 Find X9 Pro/ColorOS16/API36、KernelSU 接口（BakaSU 管理器）的真实 ROOT、原生共享事件、诊断留存和独立安装验证。ROOT/模块/守护开启时，Realtek 8153/r8152/eth0 已实际进入以太网共享，扩展坞物理重插后自动恢复、偏好不变且无 USB 共享调用；该轮从主机见到 eth0 到共享确认约 35.5 秒。随后最后一次真实重启经用户确认没有拔插扩展坞，约开机 23.7 秒共享。OnePlus 完成 Wi-Fi 原生停止确认/重新开启、USB 活跃保留与 ROOT 升级。原始未枚举故障根因尚未证实，阶段对照见 [RELIABILITY_0.10.0.md](RELIABILITY_0.10.0.md)。
+
+## 0.10.1/code29
+
+两台手机均经独立 ROOT 更新器完成最终版 28→29，安装 APK、服务、回调及偏好检查通过。桌面开关、原桌面上划和 Find Hans 冻结对照见 [RELIABILITY_0.10.1.md](RELIABILITY_0.10.1.md)。用户休息后没有重新启动手机或要求物理拔插，未连接 VPN。

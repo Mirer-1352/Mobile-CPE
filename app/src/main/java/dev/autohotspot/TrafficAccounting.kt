@@ -1,7 +1,5 @@
 package dev.autohotspot
 
-import org.json.JSONObject
-
 data class NetInterface(val name: String, val rx: Long, val tx: Long, val carrier: Boolean, val master: String? = null)
 
 object TrafficAccounting {
@@ -19,39 +17,6 @@ object TrafficAccounting {
                 parent = byName[parent]?.master
             }
             !covered
-        }
-    }
-}
-data class Snapshot(val active: Set<Sharing>, val clients: Int?, val nets: List<NetInterface>, val usb: Boolean,
-                    val ethernetSupported: Boolean, val ethernetConnected: Boolean = false,
-                    val ethernetPresent: Boolean = ethernetConnected,
-                    val usbHost: Boolean = false, val usbDevice: Boolean? = null) {
-    fun usbReady(broadcastConnected: Boolean, broadcastHost: Boolean = false): Boolean =
-        usbDevice ?: ((usb || broadcastConnected) && !usbHost && !broadcastHost)
-    fun usbHostOnly(broadcastHost: Boolean = false) = (usbHost || broadcastHost) && usbDevice != true
-    companion object {
-        fun parse(json: JSONObject): Snapshot {
-            fun strings(key: String): List<String> = json.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList()
-            val wifi = strings("wifiRegex")
-            val usb = strings("usbRegex")
-            fun matches(name: String, patterns: List<String>) = patterns.any { runCatching { Regex(it).matches(name) }.getOrDefault(false) }
-            val active = strings("active").mapNotNull { name -> when {
-                matches(name, usb) || name.matches(Regex("(rndis|usb|ncm)\\d+")) -> Sharing.USB
-                matches(name, wifi) || name.matches(Regex("(wlan|ap|softap|swlan)\\d+")) -> Sharing.WIFI
-                name.matches(Regex("(eth|enp|enx|end).*")) -> Sharing.ETHERNET
-                else -> null
-            } }.toSet()
-            val array = json.getJSONArray("interfaces")
-            val activeNames = strings("active").toSet()
-            val nets = (0 until array.length()).map { array.getJSONObject(it) }.map {
-                NetInterface(it.getString("name"), it.getLong("rx"), it.getLong("tx"), it.optBoolean("carrier"),
-                    it.optString("master").takeIf { name -> name.isNotBlank() })
-            }
-            return Snapshot(active, if (json.isNull("clients")) null else json.getInt("clients"),
-                TrafficAccounting.downstream(nets, activeNames), json.optBoolean("usbConnected"), json.optBoolean("ethernetSupported"),
-                nets.any { it.carrier && it.name.matches(Regex("(eth|enp|enx|end).*")) },
-                nets.any { it.name.matches(Regex("(eth|enp|enx|end).*")) },
-                json.optBoolean("usbHost"), json.opt("usbDevice") as? Boolean)
         }
     }
 }

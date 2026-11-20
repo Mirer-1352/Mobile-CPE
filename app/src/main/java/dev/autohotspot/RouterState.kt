@@ -24,7 +24,8 @@ data class RouterState(
     val signal: Int? = null, val dbm: Int? = null,
     val status: String = "正在连接 Root", val events: List<String> = emptyList(),
     val ethernetSupported: Boolean = android.os.Build.VERSION.SDK_INT >= 30,
-    val usbConnected: Boolean = false, val ethernetConnected: Boolean = false
+    val usbConnected: Boolean = false, val ethernetConnected: Boolean = false,
+    val sharingProgress: Map<Sharing, SharingProgress> = emptyMap()
 )
 object Router {
     private val mutable = MutableStateFlow(RouterState())

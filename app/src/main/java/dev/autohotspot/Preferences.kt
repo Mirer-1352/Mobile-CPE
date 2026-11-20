@@ -50,10 +50,15 @@ class Preferences private constructor(context: Context) {
                 if ((mode in before.pendingStops) != (mode in next.pendingStops)) putBoolean("stop_${mode.type}", mode in next.pendingStops)
             }
         }.commit()) { "无法保存配置" }
+        AppDiagnostics.record("config.changed", JSONObject().put("enabled", next.enabled).put("boot", next.boot)
+            .put("recover", next.recover).put("frameworkGuardian", next.frameworkGuardian).put("vpnSharing", next.vpnSharing)
+            .put("desired", org.json.JSONArray(next.desired.map { it.name }))
+            .put("pendingStops", org.json.JSONArray(next.pendingStops.map { it.name })))
     }
     internal fun guardianConfiguration(): JSONObject = guardianConfiguration(prefs.all)
     internal fun systemConfiguration(): JSONObject = prefs.all.let { values ->
-        JSONObject().put("policy", guardianConfiguration(values)).put("forceHome", values["forceHome"] as? Boolean ?: false)
+        JSONObject().put("policy", guardianConfiguration(values)).put("defaultHome", values["forceHome"] as? Boolean ?: false)
+            .put("originalHome", values["originalHome"] as? String ?: "")
     }
     private fun guardianConfiguration(values: Map<String, *>): JSONObject {
         return JSONObject().put("schema", 1).put("user", android.os.Process.myUid() / 100000)
