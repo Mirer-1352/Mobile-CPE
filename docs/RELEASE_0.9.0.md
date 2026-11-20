@@ -27,3 +27,10 @@ SHA-256：`380dd1c6f4ab58839e1e40fb3d98053d0cde21a97918751fc9e7a82a520216b0`。
 - 此前 code21/22 的完整重构验收见 DEVICE_RESULTS.md。Find X9 Pro 的原问题未在对应硬件上复现或证实修复，需后续取日志与对照测试。
 
 接口依据：[AOSP USB 数据角色](https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/hardware/usb/UsbPortStatus.java)；[AOSP 重复共享请求处理](https://android.googlesource.com/platform/packages/modules/Connectivity/+/refs/heads/main/Tethering/src/com/android/networkstack/tethering/Tethering.java)。
+
+## 发布结果
+
+- [GitHub Release v0.9.0](https://github.com/daxiaamu/Mobile-CPE/releases/tag/v0.9.0) 已公开，唯一 APK 的 GitHub 服务端摘要与上述摘要一致。
+- 发布源码提交：`e962b9762dc145cdd073f56c28d989047d75a372`；设备测试材料、框架提取文件、构建缓存和签名私钥未上传。
+- [更新工作流 44651150926](https://github.com/daxiaamu/Mobile-CPE/actions/runs/44651150926) 成功；Runner 再次运行 11 项发布器测试，并通过 8 个不同 CDN 主机的完整 APK GET/哈希验证。
+- stable revision 1，versionCode 23，强制边界仍为 0。不可变 manifest 提交 `4e12276be3e08b140d4a6b715fd4c68461b97ab0`，摘要 `9338dc50eb78348bc21bd22ccbbee8e0ed06f887f97ef8b8bd0fbff592ed1e90`；`updates/latest-stable.json` 已指向该提交。
