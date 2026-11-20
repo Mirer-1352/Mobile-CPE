@@ -1,0 +1,49 @@
+name: Publish update metadata
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published Release tag
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: mobile-cpe-update-metadata
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test publisher policy and validation
+        run: python -m unittest discover -s scripts -p 'test_update_metadata.py' -v
+      - name: Obtain published Release and its unique APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        shell: bash
+        run: |
+          mkdir -p .release
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > .release/release.json
+          python scripts/update_metadata.py validate-release --release .release/release.json
+          gh release download "$RELEASE_TAG" --pattern '*.apk' --dir .release
+      - name: Verify APK, test CDN bytes, publish immutable manifest and latest pointer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          test -x "$BUILD_TOOLS/aapt2"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python scripts/update_metadata.py publish --release .release/release.json --apk-dir .release --aapt2 "$BUILD_TOOLS/aapt2" --apksigner "$BUILD_TOOLS/apksigner"

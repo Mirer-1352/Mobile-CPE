@@ -1,0 +1,12 @@
+{
+  "stable": {
+    "policyRevision": 1,
+    "maxForcedVersionCode": 0,
+    "reason": "首次接入更新，默认不强制升级"
+  },
+  "beta": {
+    "policyRevision": 1,
+    "maxForcedVersionCode": 0,
+    "reason": "首次接入测试渠道，默认不强制升级"
+  }
+}

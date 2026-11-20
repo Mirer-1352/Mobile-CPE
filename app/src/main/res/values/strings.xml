@@ -1,0 +1,3 @@
+<resources>
+    <string name="module_description">手机CPE：自动共享、VPN 上游与桌面接管。需要支持 libxposed API 102 的框架。</string>
+</resources>
