@@ -135,3 +135,7 @@
 ## 0.10.1/code29
 
 两台手机均经独立 ROOT 更新器完成最终版 28→29，安装 APK、服务、回调及偏好检查通过。桌面开关、原桌面上划和 Find Hans 冻结对照见 [RELIABILITY_0.10.1.md](RELIABILITY_0.10.1.md)。用户休息后没有重新启动手机或要求物理拔插，未连接 VPN。
+
+## 0.11.1/code33 一加 9R / Android 14
+
+2026-11-24 用户新连接设备实测发现并修复 ROOT 电话服务管理器初始化缺失；自身 ROOT 32→33 覆盖更新与 SHA 校验通过，NR 物理回调、长按 MCPE 详情、Wi-Fi→蜂窝→Wi-Fi 上游切换、热点保持、强停重开和 ROOT 会话清理通过。系统只上报单 NR 载波，频段/带宽缺失，未推测补齐；此高通平台 AMBR 明确不支持，MTK 和多载波仍待验证。偏好未变、Wi-Fi 实际重新关联且 validated=true、system_server 未重启。完整边界见 [蜂窝信息说明](CELLULAR_RADIO.md)。未重启、未发布。

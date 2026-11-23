@@ -2,9 +2,11 @@
 
 基于 Root 的 Android 随身路由器，原生 Kotlin + Jetpack Compose。最低 Android 9（API 28），以太网输出需要 Android 11+ 的原生 Tethering 服务与 USB 网卡驱动。本项目不承诺所有厂商 ROM 通用；下面的设备验证仍需在真实 Root 手机上执行。
 
-[下载 0.10.2](https://github.com/daxiaamu/Mobile-CPE/releases/tag/v0.10.2)。发布包为非调试 Release 变体，使用 R8 优化与资源压缩，沿用现有开发签名，可覆盖此前测试安装。当前为公开测试阶段。
+[下载 0.11.1](https://github.com/daxiaamu/Mobile-CPE/releases/tag/v0.11.1)。发布包为非调试 Release 变体，使用 R8 优化与资源压缩，沿用现有开发签名，可覆盖此前测试安装。当前为公开测试阶段。
 
 0.10.2/code31 已加入源码入口，并启用 Release R8，见 [版本记录](docs/RELEASE_0.10.2.md)。默认桌面开关和可选 ROM 后台保护见 [0.10.1 验证](docs/RELIABILITY_0.10.1.md)。
+
+0.11.1/code33 增加顶部载波聚合与网络 AMBR 显示，并修复独立 ROOT 进程电话服务初始化；已在一加 9R/Android 14 验证 NR 回调、切网上游和重开恢复。AMBR 尚不支持此高通平台，MTK 查询仍待实机验证，详见 [版本记录](docs/RELEASE_0.11.1.md) 与 [蜂窝信息说明](docs/CELLULAR_RADIO.md)。
 
 ## 功能
 

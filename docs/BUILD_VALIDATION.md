@@ -156,3 +156,11 @@ Debug/Release 构建及 lint、111 项 JVM 测试、APK 签名通过。Find 与 
 ## 0.10.2/code31
 
 Release 开启 R8 与资源压缩，Debug 保持未压缩。两种构建与 lint、111 项核心测试、签名和最终 DEX/模块入口检查通过；APK 约 2.07 MB。OnePlus 完成未压缩→R8→最终 R8 的独立 ROOT 升级，并验证源码链接与 API 102 服务连接。Find 只完成候选压缩包 ROOT 只读检查，随后无线调试失联，没有安装最终版。证据与映射归档见 [RELEASE_0.10.2.md](RELEASE_0.10.2.md)。
+
+## 0.11.0/code32 本地候选
+
+2026-11-23 干净构建 Release/Debug、两种 lint 通过（0 errors / 38 warnings），132 项 JVM 测试通过。Release 保持 R8 与资源压缩；最终 APK 签名、ROOT/模块入口、编译期模块 API 排除和混淆检查通过。APK 2,101,025 字节，SHA-256 `1649c714bfff261595871dc40aaed2f2a578dc1f6048693e9bd64b1f3e1fceb1`。新增物理载波和网络 AMBR 采集的适配范围、协议测试及未完成实机验证见 [蜂窝信息说明](CELLULAR_RADIO.md)。未发布、未安装、未重启手机。
+
+## 0.11.1/code33 一加 9R 实测修复
+
+2026-11-24 修复独立 ROOT 进程未初始化模块电话服务管理器导致误报无 SIM。Release/Debug 构建、两种 lint 通过（0 errors / 40 warnings），132 项核心测试与签名、R8 入口检查通过。实际在一加 9R/Android 14 完成自身 ROOT 32→33 更新、NR 物理回调、切网/恢复及强停重开验证，偏好和 system_server 保持不变。APK SHA-256 `aec0e9b4b53e212ac23589037d2d0e2b534ce4d82089846b9d7b252f7204ac20`；真实 AMBR 和多载波仍未实机验收，详见 [蜂窝信息说明](CELLULAR_RADIO.md)。未发布、未重启手机。

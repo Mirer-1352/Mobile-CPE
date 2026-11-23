@@ -9,8 +9,8 @@ android {
         applicationId = "dev.autohotspot"
         minSdk = 28
         targetSdk = 35
-        versionCode = 31
-        versionName = "0.10.2"
+        versionCode = 33
+        versionName = "0.11.1"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

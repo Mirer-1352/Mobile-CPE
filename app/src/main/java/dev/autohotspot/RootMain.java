@@ -16,6 +16,7 @@ public final class RootMain {
     private static volatile Integer clients;
     private static Object wifiCallback;
     private static TetheringBackend backend;
+    private static RootCellularBackend cellular;
     private static final RootVendorBackgroundLease backgroundLease = new RootVendorBackgroundLease();
     private static final Executor executor = command -> new Handler(callbacks.getLooper()).post(command);
 
@@ -31,6 +32,10 @@ public final class RootMain {
                     JSONObject request = new JSONObject(line);
                     switch (request.getString("op")) {
                         case "snapshot": reply(snapshot()); break;
+                        case "cellular":
+                            if (cellular == null) cellular = new RootCellularBackend(context);
+                            reply(new JSONObject().put("ok", true).put("cellular", cellular.snapshot()));
+                            break;
                         case "background":
                             GuardianPolicy protection = GuardianPolicy.parse(request.getJSONObject("data"));
                             if (AndroidPlatform.asUser(context, protection.user).getPackageManager()
@@ -74,6 +79,7 @@ public final class RootMain {
             catch (Exception ignored) { }
         } finally {
             if (backend != null) backend.close();
+            if (cellular != null) cellular.close();
             System.exit(0);
         }
     }

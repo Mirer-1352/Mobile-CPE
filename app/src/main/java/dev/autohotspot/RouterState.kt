@@ -22,6 +22,7 @@ data class RouterState(
     val down: Double? = null, val up: Double? = null,
     val operator: String = "未读取运营商", val generation: String = "—",
     val signal: Int? = null, val dbm: Int? = null,
+    val cellular: CellularInfo = CellularInfo(),
     val status: String = "正在连接 Root", val events: List<String> = emptyList(),
     val ethernetSupported: Boolean = android.os.Build.VERSION.SDK_INT >= 30,
     val usbConnected: Boolean = false, val ethernetConnected: Boolean = false,

@@ -76,6 +76,10 @@ private val DisplayConnected = Color(0xFF64DC94)
                         add(state.dbm?.let { "$it dBm" } ?: "信号 ${state.signal?.let { "$it/4" } ?: "—"}")
                         add(when { !state.running -> "守护已暂停"; !state.root -> "Root 未连接"; else -> "守护运行中" })
                     }.joinToString("  ·  "), fontSize = 12.sp, color = DisplayMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(state.cellular.aggregation, fontSize = 12.sp, color = DisplayMuted)
+                        Text(state.cellular.limit, fontSize = 12.sp, color = DisplayMuted)
+                    }
                 }
                 HorizontalDivider(color = DisplayRule)
                 if (landscape) {

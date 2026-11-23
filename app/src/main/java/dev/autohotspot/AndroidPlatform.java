@@ -35,6 +35,16 @@ final class AndroidPlatform {
         return systemContext();
     }
 
+    /** app_process does not run RuntimeInit's modular telephony service bootstrap. */
+    static void initializeTelephony() throws Exception {
+        Class<?> initializer;
+        try { initializer = Class.forName("android.telephony.TelephonyFrameworkInitializer"); }
+        catch (ClassNotFoundException legacy) { return; }
+        if (initializer.getMethod("getTelephonyServiceManager").invoke(null) != null) return;
+        Class<?> manager = Class.forName("android.os.TelephonyServiceManager");
+        initializer.getMethod("setTelephonyServiceManager", manager).invoke(null, manager.getConstructor().newInstance());
+    }
+
     static Field field(Class<?> type, String name) throws NoSuchFieldException {
         for (Class<?> current = type; current != null; current = current.getSuperclass()) {
             try {

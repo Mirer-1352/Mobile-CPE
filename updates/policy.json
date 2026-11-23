@@ -1,8 +1,8 @@
 {
   "stable": {
-    "policyRevision": 2,
+    "policyRevision": 3,
     "maxForcedVersionCode": 0,
-    "reason": "发布 0.10.2/code31：共享可靠性、默认桌面开关、后台保护、源码入口与 R8；保持强制更新边界为 0"
+    "reason": "发布 0.11.1/code33：载波与 AMBR 显示、ROOT 电话服务初始化修复；保持强制更新边界为 0"
   },
   "beta": {
     "policyRevision": 1,

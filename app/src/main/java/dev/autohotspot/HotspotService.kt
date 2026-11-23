@@ -14,6 +14,7 @@ class HotspotService : Service() {
     private lateinit var root: RootClient
     private lateinit var prefs: Preferences
     private lateinit var cell: CellMonitor
+    private var cellular: CellularMonitor? = null
     private var task: Job? = null
     private var usbConnected = false
     private var usbHost = false
@@ -43,6 +44,7 @@ class HotspotService : Service() {
             .setContentTitle("手机CPE").setContentText("共享守护运行中")
             .setContentIntent(open).setOngoing(true).build()
         startForeground(1, notice)
+        cellular = CellularMonitor(this)
         val usbEvents = IntentFilter("android.hardware.usb.action.USB_STATE").apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -119,7 +121,7 @@ class HotspotService : Service() {
         stopSelf()
     }
     override fun onDestroy() {
-        task?.cancel(); scope.cancel(); topologyChanges.close(); root.close(); cell.close()
+        task?.cancel(); scope.cancel(); topologyChanges.close(); root.close(); cell.close(); cellular?.close()
         runCatching { unregisterReceiver(usb) }
         if (wake?.isHeld == true) wake?.release()
         Router.update { it.copy(running = false, root = false, fresh = false, down = null, up = null,

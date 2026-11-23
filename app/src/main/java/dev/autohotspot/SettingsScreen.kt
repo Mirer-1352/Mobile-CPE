@@ -56,6 +56,14 @@ internal class SettingsActions(
                     Setting("屏幕常亮", "面板显示时保持亮屏", options.keepScreen) { value -> actions.change { it.copy(keepScreen = value) } }
                     Setting("防烧屏位移", "每 3 分钟轻微移动面板，缓解固定画面残留", options.burnInProtection) { value -> actions.change { it.copy(burnInProtection = value) } }
                 }
+                Section("蜂窝网络") {
+                    val radio = state.cellular
+                    Text(radio.aggregation, fontWeight = FontWeight.SemiBold)
+                    Text(cellularStatus(radio.channelStatus), fontSize = 12.sp, color = Muted)
+                    radio.carriers.forEach { Text(it.detail, fontSize = 13.sp) }
+                    Text(radio.limit, fontWeight = FontWeight.SemiBold)
+                    Text(radio.ambr?.let { "${it.kind} · 网络下发上限" } ?: cellularStatus(radio.ambrStatus), fontSize = 12.sp, color = Muted)
+                }
                 Section("桌面模式") {
                     Setting("设为默认桌面", when {
                         root.error != null -> "Root 同步失败：${root.error}"
